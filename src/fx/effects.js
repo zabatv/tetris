@@ -128,6 +128,12 @@ export class ScreenFX {
     this.zooms.push({ amount: amount * this.soften, duration, time: 0, ease });
   }
 
+  /** Короткий пинок камеры: тряска и микрозум одним движением. */
+  bump(power = 2, amount = 0.008, duration = 140) {
+    this.shake(power, duration);
+    this.zoomPunch(amount, duration + 40);
+  }
+
   flash(color = 'rgba(255,255,255,0.6)', duration = 240) {
     this.flashes.push({ color, duration, time: 0 });
   }
@@ -271,14 +277,24 @@ export class ScreenFX {
       saturate += 0.7 * Math.sin(Math.PI * k);
     }
 
+    // Лёгкое покачивание есть всегда: застывшая камера выглядит мёртвой.
+    // Только сдвиг — поворот и масштаб заставляли бы слой пересчитываться
+    // каждый кадр даже в полном покое.
+    if (madness > 0) {
+      dx += Math.sin(this.time * 0.00071) * 1.6 * madness;
+      dy += Math.cos(this.time * 0.00053) * 1.2 * madness;
+    }
+
     // Фоновое безумие: медленное дыхание и плывущий оттенок.
     if (this.ambient > 0) {
       this.hueSpin += dt * 0.02 * this.ambient;
       hue += Math.sin(this.time * 0.0006) * 14 * this.ambient + this.hueSpin * 0.35;
       saturate += 0.35 * this.ambient;
       contrast += 0.12 * this.ambient;
-      scale += Math.sin(this.time * 0.0018) * 0.006 * this.ambient;
-      rot += Math.sin(this.time * 0.0009) * 0.25 * this.ambient;
+      scale += Math.sin(this.time * 0.0018) * 0.022 * this.ambient;
+      rot += Math.sin(this.time * 0.0009) * 0.6 * this.ambient;
+      dx += Math.sin(this.time * 0.0026) * 3 * this.ambient;
+      dy += Math.cos(this.time * 0.0021) * 2.4 * this.ambient;
       vignette += 0.25 * this.ambient;
     }
 

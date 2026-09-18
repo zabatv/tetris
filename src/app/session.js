@@ -224,10 +224,12 @@ export class Session {
     switch (type) {
       case 'move':
         this.audio.move();
+        this.fx.bump(1.4, 0.004, 110);
         break;
 
       case 'rotate': {
         this.audio.rotate();
+        this.fx.bump(2.2, 0.01, 150);
         if (this.game.piece) {
           const [x, y] = toScreen(this.game.piece.x + 1.5, this.game.piece.y + 1.5);
           this.particles.dust(x, y, colorOf(this.game.piece.id), 3);
@@ -241,10 +243,13 @@ export class Session {
           this.softSoundTimer = performance.now();
           this.audio.soft();
         }
+        this.fx.bump(1.1, 0.003, 90);
         break;
 
       case 'hold':
         this.audio.hold();
+        this.fx.bump(3, 0.018, 220);
+        this.fx.chromatic(160);
         break;
 
       case 'harddrop': {
@@ -259,8 +264,8 @@ export class Session {
         }
         // Удар о дно: стоп-кадр, тряска и лучи по краям.
         this.time.freeze(18 + Math.min(40, distance * 2.5));
-        this.fx.shake(4 + distance * 0.8, 260);
-        this.fx.zoomPunch(0.03 + distance * 0.006, 260);
+        this.fx.shake(6 + distance * 1.1, 280);
+        this.fx.zoomPunch(0.05 + distance * 0.012, 300);
         this.fx.speed(0.35 + distance * 0.05, 0.004);
         if (distance >= 8) this.fx.chromatic(260);
         if (distance >= 14) this.fx.glitch(220, 0.6);
@@ -273,7 +278,10 @@ export class Session {
           const [x, y] = toScreen(col, row);
           this.particles.dust(x, y + cell * 0.4, colorOf(payload.piece.id), 2);
         }
-        this.fx.shake(3, 150);
+        // Каждая посадка фигуры отдаёт в камеру — иначе игра кажется мёртвой.
+        this.time.freeze(14);
+        this.fx.shake(5, 180);
+        this.fx.zoomPunch(0.022, 220);
         if (payload.spin !== 'none') {
           // Спин без слома тоже надо заметить.
           this.fx.hueBurst(180, 500);
@@ -325,6 +333,8 @@ export class Session {
       case 'garbage':
         this.audio.garbage(payload.count);
         this.fx.shake(4 + payload.count * 1.5, 320);
+        // Мусор давит: камера отъезжает, стакан будто проваливается.
+        this.fx.zoom(-0.05 - payload.count * 0.01, 500, 0.3);
         this.fx.flash('rgba(251,113,133,0.3)', 260);
         this.fx.glitch(260, 0.7);
         this.fx.hueBurst(-120, 420);

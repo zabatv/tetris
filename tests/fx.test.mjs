@@ -115,6 +115,29 @@ test('тряска затухает и очищает очередь', () => {
   assert.equal(fx.shakes.length, 0);
 });
 
+test('камера покачивается даже без событий', () => {
+  const { fx, stage } = makeFX();
+  fx.setMadness(1);
+  fx.update(16);
+  const first = stage.style.transform;
+  for (let i = 0; i < 30; i++) fx.update(16);
+  assert.notEqual(stage.style.transform, first, 'застывшая картинка выглядит мёртвой');
+  assert.equal(stageScale(stage), 1, 'но масштаб в покое не трогаем — это дорого');
+});
+
+test('пинок камеры даёт и тряску, и микрозум', () => {
+  const { fx, stage } = makeFX();
+  fx.setMadness(1);
+  fx.bump(4, 0.02, 200);
+  assert.equal(fx.shakes.length, 1);
+  assert.equal(fx.punches.length, 1);
+  fx.update(60);
+  assert.ok(stageScale(stage) > 1, 'зум успевает подскочить');
+  for (let i = 0; i < 20; i++) fx.update(16);
+  assert.equal(fx.shakes.length, 0);
+  assert.equal(fx.punches.length, 0);
+});
+
 test('вспышка гаснет, глитч выключается сам', () => {
   const { fx, flash, glitch } = makeFX();
   fx.setMadness(1);
