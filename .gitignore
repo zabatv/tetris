@@ -1,0 +1,13 @@
+# logs
+*.log
+
+# python
+__pycache__/
+*.pyc
+
+# node / tests
+testenv/
+node_modules/
+
+# misc
+.DS_Store

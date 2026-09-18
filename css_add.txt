@@ -1,0 +1,83 @@
+#go-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+  gap: 20px;
+  backdrop-filter: blur(4px);
+}
+#go-overlay h1 {
+  font-size: 52px;
+  color: #f44;
+  text-shadow: 0 0 30px rgba(255,0,0,0.8), 0 0 120px rgba(255,0,80,0.5);
+}
+#go-overlay .final-score { font-size: 34px; color: #ff0; text-shadow: 0 0 20px rgba(255,255,0,0.8); }
+#go-overlay .combo-hit { font-size: 18px; color: #f0f; text-shadow: 0 0 12px rgba(255,0,255,0.8); }
+
+.rb-root { position: fixed; inset: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+
+.spotcard { position: relative; }
+.spotcard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(0,255,255,0.18), rgba(255,0,255,0.08) 45%, transparent 65%);
+  opacity: 0;
+  transition: opacity 0.35s;
+  pointer-events: none;
+  z-index: 0;
+}
+.spotcard:hover::before { opacity: 1; }
+.spotcard > * { position: relative; z-index: 1; }
+
+.mbtn { position: relative; overflow: hidden; }
+.mbtn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.5s;
+}
+.mbtn:hover::after { transform: translateX(120%); }
+
+.rb-lobby { animation: beamIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1); }
+#sidebar .panel { animation: panelIn 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+#sidebar .panel:nth-child(1) { animation-delay: 0.02s; }
+#sidebar .panel:nth-child(2) { animation-delay: 0.08s; }
+#sidebar .panel:nth-child(3) { animation-delay: 0.14s; }
+#sidebar .panel:nth-child(4) { animation-delay: 0.20s; }
+#sidebar .panel:nth-child(5) { animation-delay: 0.26s; }
+#sidebar .panel:nth-child(6) { animation-delay: 0.32s; }
+#game-wrapper { animation: beamIn 0.7s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+#opponents .opp { animation: panelIn 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) both; transform-origin: center top; }
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(26px) scale(0.96); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes beamIn {
+  from { opacity: 0; transform: translateX(-30px) scale(0.98); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+.rb-title {
+  font-size: 18px;
+  letter-spacing: 3px;
+  font-weight: 900;
+  background: linear-gradient(90deg, #f0f, #0ff, #ff0, #f0f);
+  background-size: 400% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rainbow 4s linear infinite;
+  margin-bottom: 6px;
+  text-align: center;
+}
+.rl-empty { color: #556; font-size: 11px; padding: 4px; }
+.rl-code { color: #0ff; font-weight: bold; letter-spacing: 1px; }
+.rl-ps { color: #aaa; }
+#roomlist button.spotcard { display: flex; justify-content: space-between; }
