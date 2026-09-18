@@ -1,161 +1,191 @@
+#!/usr/bin/env python3
+"""WebSocket-бэкенд мультиплеера: комнаты, чат, состояние досок и атаки.
+
+Сервер ничего не знает о правилах игры — он только раздаёт сообщения
+участникам комнаты. Вся логика живёт на клиенте.
+"""
+
+from __future__ import annotations
+
 import asyncio
 import json
+import logging
 import random
 import string
+from dataclasses import dataclass, field
 
 from websockets.server import serve
 
+HOST = "0.0.0.0"
+PORT = 8283
+MAX_PLAYERS = 8
+MAX_NICK = 16
+MAX_CHAT = 200
+CODE_LENGTH = 5
 
+# Поля состояния, которые пересылаются соперникам как есть.
+STATE_FIELDS = ("board", "piece", "gy", "score", "lines", "level", "combo", "over")
+
+log = logging.getLogger("tetris")
+
+
+@dataclass
+class Player:
+    id: int
+    ws: object
+    nick: str
+    room: str | None = None
+
+
+@dataclass
 class Room:
-    def __init__(self, code):
-        self.code = code
-        self.clients = {}
-        self.nicks = {}
+    code: str
+    players: dict[int, Player] = field(default_factory=dict)
+
+    @property
+    def full(self) -> bool:
+        return len(self.players) >= MAX_PLAYERS
+
+    def info(self) -> dict:
+        return {
+            "type": "room",
+            "code": self.code,
+            "players": [{"id": p.id, "nick": p.nick} for p in self.players.values()],
+        }
 
 
-rooms = {}
-clients = {}
+rooms: dict[str, Room] = {}
 
 
-def rand_code(n=5):
-    return ''.join(random.choices(string.digits, k=n))
+def new_code() -> str:
+    while True:
+        code = "".join(random.choices(string.digits, k=CODE_LENGTH))
+        if code not in rooms:
+            return code
 
 
-async def send(ws, obj):
+def clean_nick(value) -> str:
+    return (str(value or "")[:MAX_NICK].strip()) or "Игрок"
+
+
+async def send(ws, payload: dict) -> None:
     try:
-        await ws.send(json.dumps(obj))
+        await ws.send(json.dumps(payload))
     except Exception:
-        pass
+        pass  # сокет уже закрыт — уборка произойдёт в finally
 
 
-async def broadcast(room, obj, exclude=None):
-    for cid, ws in list(room.clients.items()):
-        if cid != exclude:
-            await send(ws, obj)
+async def broadcast(room: Room, payload: dict, exclude: int | None = None) -> None:
+    for player in list(room.players.values()):
+        if player.id != exclude:
+            await send(player.ws, payload)
 
 
-async def room_info(room):
-    return {
-        'type': 'room',
-        'code': room.code,
-        'players': [
-            {'id': cid, 'nick': room.nicks[cid]}
-            for cid in room.clients
-        ],
-    }
+async def join_room(player: Player, room: Room) -> None:
+    room.players[player.id] = player
+    player.room = room.code
+    await send(player.ws, {"type": "joined", "room": room.code, "you": player.id})
+    await broadcast(room, room.info())
 
 
-async def handler(ws):
-    cid = None
-    code = None
-    nick = None
+async def leave_room(player: Player) -> None:
+    room = rooms.get(player.room or "")
+    if not room:
+        return
+    room.players.pop(player.id, None)
+    player.room = None
+    if not room.players:
+        rooms.pop(room.code, None)
+        return
+    await broadcast(room, room.info())
+    await broadcast(room, {"type": "chat", "nick": "*", "msg": f"{player.nick} вышел"})
+
+
+async def handle_message(player: Player, message: dict) -> None:
+    kind = message.get("type")
+
+    if kind == "create":
+        player.nick = clean_nick(message.get("nick"))
+        await leave_room(player)
+        room = Room(new_code())
+        rooms[room.code] = room
+        await join_room(player, room)
+        await send(player.ws, {
+            "type": "chat", "nick": "*",
+            "msg": f"Комната {room.code} создана. Ты — {player.nick}",
+        })
+
+    elif kind == "join":
+        player.nick = clean_nick(message.get("nick"))
+        room = rooms.get(str(message.get("room") or "").strip())
+        if room is None:
+            await send(player.ws, {"type": "err", "msg": "Комната не найдена"})
+        elif room.full:
+            await send(player.ws, {"type": "err", "msg": f"Комната полна ({MAX_PLAYERS}/{MAX_PLAYERS})"})
+        else:
+            await leave_room(player)
+            await join_room(player, room)
+            await broadcast(room, {"type": "chat", "nick": "*", "msg": f"{player.nick} зашёл"})
+
+    elif kind == "leave":
+        await leave_room(player)
+
+    elif kind == "list":
+        await send(player.ws, {"type": "rooms", "rooms": [
+            {"code": room.code, "players": len(room.players)}
+            for room in rooms.values() if not room.full
+        ]})
+
+    elif kind == "chat":
+        room = rooms.get(player.room or "")
+        text = str(message.get("msg", ""))[:MAX_CHAT].strip()
+        if room and text:
+            await broadcast(room, {"type": "chat", "nick": player.nick, "msg": text})
+
+    elif kind == "state":
+        room = rooms.get(player.room or "")
+        if room and len(room.players) > 1:
+            payload = {"type": "state", "id": player.id, "nick": player.nick}
+            payload.update({key: message.get(key) for key in STATE_FIELDS})
+            await broadcast(room, payload, exclude=player.id)
+
+    elif kind == "attack":
+        room = rooms.get(player.room or "")
+        lines = int(message.get("lines") or 0)
+        if room and 0 < lines <= 20:
+            # Мусор уходит всем соперникам в комнате — целиться пока некуда.
+            await broadcast(room, {
+                "type": "attack", "id": player.id, "nick": player.nick, "lines": lines,
+            }, exclude=player.id)
+
+
+async def handler(ws) -> None:
+    player = Player(id=id(ws), ws=ws, nick="Игрок")
+    log.info("connect %s", player.id)
     try:
         async for raw in ws:
             try:
-                msg = json.loads(raw)
-                mtype = msg.get('type')
-            except Exception:
+                message = json.loads(raw)
+            except (ValueError, TypeError):
                 continue
-
-            if mtype == 'create':
-                nick = (msg.get('nick') or 'player')[:16].strip() or 'player'
-                code = rand_code()
-                while code in rooms:
-                    code = rand_code()
-                room = Room(code)
-                rooms[code] = room
-                cid = id(ws)
-                room.clients[cid] = ws
-                room.nicks[cid] = nick
-                clients[cid] = (ws, code, nick)
-                await send(ws, {'type': 'joined', 'room': code, 'you': cid})
-                await broadcast(room, await room_info(room))
-                await send(ws, {
-                    'type': 'chat', 'nick': '*',
-                    'msg': f'Комната {code} создана. Ты: {nick}',
-                })
-
-            elif mtype == 'join':
-                nick = (msg.get('nick') or 'player')[:16].strip() or 'player'
-                room_code = str(msg.get('room') or '').strip()
-                room = rooms.get(room_code)
-                if not room:
-                    await send(ws, {'type': 'err', 'msg': 'Комната не найдена'})
-                    continue
-                if len(room.clients) >= 8:
-                    await send(ws, {'type': 'err', 'msg': 'Комната полна (8/8)'})
-                    continue
-                code = room_code
-                cid = id(ws)
-                room.clients[cid] = ws
-                room.nicks[cid] = nick
-                clients[cid] = (ws, code, nick)
-                await send(ws, {'type': 'joined', 'room': code, 'you': cid})
-                await broadcast(room, await room_info(room))
-                await broadcast(room, {
-                    'type': 'chat', 'nick': '*',
-                    'msg': f'{nick} зашёл в комнату',
-                })
-
-            elif mtype == 'leave':
-                break
-
-            elif mtype == 'list':
-                open_rooms = [
-                    {'code': r.code, 'players': len(r.clients)}
-                    for r in rooms.values()
-                ]
-                await send(ws, {'type': 'rooms', 'rooms': open_rooms})
-
-            elif mtype == 'chat':
-                text = str(msg.get('msg', ''))[:200].strip()
-                if not code or not text:
-                    continue
-                room = rooms.get(code)
-                if room:
-                    payload = {'type': 'chat', 'nick': nick, 'msg': text}
-                    await broadcast(room, payload)
-                    await send(ws, payload)
-
-            elif mtype == 'state':
-                if not code:
-                    continue
-                room = rooms.get(code)
-                if room and len(room.clients) > 1:
-                    await broadcast(room, {
-                        'type': 'state',
-                        'id': cid,
-                        'nick': nick,
-                        'board': msg.get('board'),
-                        'piece': msg.get('piece'),
-                        'gy': msg.get('gy'),
-                        'score': msg.get('score'),
-                        'lines': msg.get('lines'),
-                        'level': msg.get('level'),
-                        'over': msg.get('over', 0),
-                    }, exclude=cid)
-    except Exception:
-        pass
+            if isinstance(message, dict):
+                await handle_message(player, message)
+    except Exception as err:
+        log.debug("socket error: %s", err)
     finally:
-        if code:
-            clients.pop(cid, None)
-            room = rooms.get(code)
-            if room:
-                room.clients.pop(cid, None)
-                room.nicks.pop(cid, None)
-                if not room.clients:
-                    rooms.pop(code, None)
-                else:
-                    await broadcast(room, await room_info(room))
-                    await broadcast(room, {
-                        'type': 'chat', 'nick': '*',
-                        'msg': f'{nick} вышел',
-                    })
+        await leave_room(player)
+        log.info("disconnect %s", player.id)
 
 
-async def main():
-    async with serve(handler, '0.0.0.0', 8283):
+async def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    log.info("WebSocket на ws://%s:%s", HOST, PORT)
+    async with serve(handler, HOST, PORT, ping_interval=20, ping_timeout=20):
         await asyncio.Future()
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        log.info("остановлен")

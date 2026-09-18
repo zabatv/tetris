@@ -1,0 +1,86 @@
+/* Токены темы: цвета, радиусы, тени и типографика. Тема — «неоновое стекло»:
+   тёмная сцена, подсвеченные панели, акцент, который теплеет с уровнем. */
+:root {
+  color-scheme: dark;
+
+  --bg: #07080d;
+  --bg-soft: #0b0d15;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-strong: rgba(255, 255, 255, 0.085);
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.18);
+
+  --text: #e9edf7;
+  --text-dim: #9aa3b8;
+  --text-faint: #6b7489;
+
+  --accent: #22d3ee;
+  --accent-2: #c084fc;
+  --accent-3: #4ade80;
+  --gold: #ffd24a;
+  --danger: #fb7185;
+
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 22px;
+
+  --shadow-panel: 0 20px 45px -28px rgba(0, 0, 0, 0.95);
+  --shadow-lift: 0 26px 60px -24px rgba(34, 211, 238, 0.45);
+
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Размер клетки задаёт всю сетку интерфейса. */
+  --cell: clamp(14px, min(3.4vw, calc((100svh - 156px) / 20)), 36px);
+  --board-w: calc(var(--cell) * 10);
+  --board-h: calc(var(--cell) * 20);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.5);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+h1, h2, h3, p {
+  margin: 0;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.35);
+}
+
+/* Тонкий скроллбар — чтобы списки не ломали композицию. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 99px; }
+*::-webkit-scrollbar-track { background: transparent; }

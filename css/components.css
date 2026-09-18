@@ -1,0 +1,476 @@
+/* Панели, кнопки, показатели, лобби и оверлеи. */
+
+.panel {
+  position: relative;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
+  box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px) saturate(130%);
+  overflow: hidden;
+}
+
+/* Подсветка следует за курсором — карточка «оживает» под рукой. */
+.panel--spot::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: radial-gradient(
+    240px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(34, 211, 238, 0.16),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity 260ms var(--ease-out);
+  pointer-events: none;
+}
+.panel--spot:hover::before { opacity: 1; }
+
+.panel__label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.panel__value {
+  font-family: var(--font-mono);
+  font-size: clamp(18px, 2.2vw, 26px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.panel__value--accent { color: var(--accent); }
+.panel__value--gold { color: var(--gold); text-shadow: 0 0 18px rgba(255, 210, 74, 0.45); }
+.panel__value--hot { color: var(--danger); }
+
+/* Счётчик «подпрыгивает» при изменении — глаз ловит момент начисления. */
+.panel__value.is-bump {
+  animation: value-bump 420ms var(--ease-spring);
+}
+
+.preview {
+  display: block;
+  width: 100%;
+  height: calc(var(--cell) * 2.6);
+}
+
+.preview--queue {
+  height: calc(var(--cell) * 8.5);
+}
+
+.preview--empty {
+  opacity: 0.25;
+}
+
+.progress {
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 320ms var(--ease-out);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.badge--live { color: var(--accent-3); border-color: rgba(74, 222, 128, 0.35); }
+.badge--warn { color: var(--danger); border-color: rgba(251, 113, 133, 0.4); }
+
+.badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+/* --- кнопки --------------------------------------------------------------- */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 99px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03));
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: transform 180ms var(--ease-out), box-shadow 220ms var(--ease-out),
+    border-color 220ms var(--ease-out), background 220ms var(--ease-out);
+}
+
+.btn:hover {
+  border-color: rgba(34, 211, 238, 0.55);
+  box-shadow: 0 10px 30px -14px rgba(34, 211, 238, 0.8);
+}
+
+.btn:active { transform: scale(0.97); }
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn--primary {
+  padding: 13px 34px;
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border-color: transparent;
+  color: #04121a;
+  background: linear-gradient(120deg, var(--accent), var(--accent-3) 48%, var(--gold));
+  box-shadow: var(--shadow-lift);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.btn--icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 15px;
+}
+
+.btn--sm { padding: 6px 12px; font-size: 12px; }
+
+.btn[disabled] { opacity: 0.45; pointer-events: none; }
+
+.btn--active {
+  border-color: rgba(34, 211, 238, 0.6);
+  color: var(--accent);
+}
+
+/* --- управление ------------------------------------------------------------ */
+
+.keys {
+  display: grid;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.keys__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+kbd {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.touchpad {
+  display: none;
+  gap: 8px;
+  width: 100%;
+}
+
+.touchpad .btn { flex: 1 1 0; padding: 12px 0; }
+
+.is-touch .touchpad { display: flex; }
+/* Подсказки по клавишам бессмысленны там, где клавиатуры нет. */
+.is-touch .panel--keys { display: none; }
+
+/* --- соперники ------------------------------------------------------------- */
+
+.opponents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opponent {
+  flex: 0 0 auto;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.opponent__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.opponent__nick {
+  font-weight: 600;
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opponent__score {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.opponent canvas {
+  display: block;
+  border-radius: 6px;
+}
+
+.empty-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 10px 6px;
+}
+
+/* --- лобби ----------------------------------------------------------------- */
+
+.lobby {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(360px, 92vw);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border-left: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(12, 14, 22, 0.96), rgba(7, 8, 13, 0.98));
+  backdrop-filter: blur(22px);
+  box-shadow: -30px 0 80px -40px rgba(0, 0, 0, 1);
+  transform: translateX(102%);
+  transition: transform 380ms var(--ease-out);
+}
+
+.lobby.is-open { transform: none; }
+
+.lobby__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lobby__title {
+  font-size: 13px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+}
+
+.field__label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  transition: border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(34, 211, 238, 0.6);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.14);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.row > .input { flex: 1 1 auto; min-width: 0; }
+
+.roomlist {
+  display: grid;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.room-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+
+.room-item:hover {
+  border-color: rgba(34, 211, 238, 0.5);
+  transform: translateX(-3px);
+}
+
+.room-item__code {
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+}
+
+.chat {
+  flex: 1 1 auto;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat__log {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.32);
+  font-size: 12.5px;
+}
+
+.chat__nick { color: var(--accent); font-weight: 600; }
+.chat__sys { color: var(--text-faint); font-style: italic; }
+
+.status-line {
+  font-size: 12px;
+  color: var(--text-dim);
+  min-height: 18px;
+}
+
+.status-line--error { color: var(--danger); }
+
+/* --- оверлеи --------------------------------------------------------------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+  background: radial-gradient(circle at 50% 45%, rgba(10, 12, 20, 0.82), rgba(4, 5, 9, 0.96));
+  backdrop-filter: blur(10px);
+  animation: overlay-in 320ms var(--ease-out);
+}
+
+.overlay__title {
+  font-family: var(--font-mono);
+  font-size: clamp(34px, 8vw, 74px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  background: linear-gradient(120deg, var(--accent), var(--accent-2) 50%, var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 32px rgba(34, 211, 238, 0.35));
+}
+
+.overlay__title--over {
+  background: linear-gradient(120deg, var(--danger), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.overlay__subtitle {
+  color: var(--text-dim);
+  max-width: 46ch;
+}
+
+.overlay__stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 0 6px;
+}
+
+.overlay__stat {
+  min-width: 108px;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.overlay__stat b {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.overlay__stat span {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.overlay__hint {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.record {
+  color: var(--gold);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
