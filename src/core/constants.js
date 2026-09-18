@@ -19,9 +19,11 @@ export const DAS = 150;
 export const ARR = 33;
 export const SOFT_DROP_RATE = 28;
 
-// Сколько длится «тизер» перед сломом рядов — зависит от их числа.
-export const CLEAR_DELAY_BASE = 260;
-export const CLEAR_DELAY_PER_ROW = 90;
+// Сколько длится «тизер» перед сломом рядов: чем больше рядов и чем хитрее
+// слом, тем дольше замедление — момент должен успеть прозвучать.
+export const CLEAR_DELAY_BASE = 420;
+export const CLEAR_DELAY_PER_ROW = 210;
+export const CLEAR_DELAY_SPIN = 260;
 
 export const MAX_LEVEL = 20;
 

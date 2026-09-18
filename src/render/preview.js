@@ -13,6 +13,7 @@ export class PreviewView {
   }
 
   resize() {
+    this.signature = null;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const rect = this.canvas.getBoundingClientRect();
     this.width = rect.width || this.canvas.clientWidth || 96;
@@ -24,6 +25,11 @@ export class PreviewView {
 
   clear() {
     this.ctx.clearRect(0, 0, this.width, this.height);
+  }
+
+  /** Сбрасывает кэш: после resize и смены масштаба надо перерисовать. */
+  invalidate() {
+    this.signature = null;
   }
 
   /** Рисует одну фигуру по центру заданной ячейки-слота. */
@@ -55,6 +61,9 @@ export class PreviewView {
   }
 
   renderQueue(ids) {
+    const signature = `${ids.slice(0, this.rows).join(',')}|${this.rows}|${this.width}x${this.height}`;
+    if (signature === this.signature) return;
+    this.signature = signature;
     this.clear();
     const slot = this.height / Math.max(1, this.rows);
     ids.slice(0, this.rows).forEach((id, i) => {
@@ -64,6 +73,9 @@ export class PreviewView {
   }
 
   renderSingle(id) {
+    const signature = `${id}|${this.width}x${this.height}`;
+    if (signature === this.signature) return;
+    this.signature = signature;
     this.clear();
     this.drawPiece(id, 0, this.height, 1);
   }

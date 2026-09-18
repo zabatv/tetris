@@ -35,6 +35,8 @@ export class BoardView {
     const ctx = this.ctx;
     const cell = this.cell;
     this.time = fx.time || this.time;
+    // Волна по стакану: ряды плывут по синусоиде, когда накаляется обстановка.
+    const warp = (fx.warp || 0) * cell * 0.5;
 
     ctx.clearRect(0, 0, this.width, this.height);
     this.drawWell(game);
@@ -49,7 +51,10 @@ export class BoardView {
       for (let c = 0; c < COLS; c++) {
         const value = game.board[r][c];
         if (!value) continue;
-        const [x, y] = this.cellPos(c, r);
+        const [bx, y] = this.cellPos(c, r);
+        const x = warp
+          ? bx + Math.sin(r * 0.55 + this.time * 0.006) * warp + (inClear ? (Math.random() - 0.5) * warp : 0)
+          : bx;
         if (inClear) {
           // Ряд разгорается и схлопывается — это и есть «тизер» перед сломом.
           const wave = Math.max(0, clearProgress - c * 0.02);
@@ -67,7 +72,7 @@ export class BoardView {
       }
     }
 
-    if (game.piece && game.phase === PHASE.FALLING) this.drawActive(game);
+    if (game.piece && game.phase === PHASE.FALLING) this.drawActive(game, warp);
     this.drawDanger(game);
     this.drawPendingGarbage(game);
     this.drawFrame();
@@ -108,9 +113,10 @@ export class BoardView {
     ctx.stroke();
   }
 
-  drawActive(game) {
+  drawActive(game, warp = 0) {
     const ctx = this.ctx;
     const cell = this.cell;
+    const shift = (row) => (warp ? Math.sin(row * 0.55 + this.time * 0.006) * warp : 0);
     const piece = game.piece;
     const shape = piece.shape;
     const ghostY = game.ghostY;
@@ -121,7 +127,7 @@ export class BoardView {
         const row = ghostY + r;
         if (row < HIDDEN_ROWS) continue;
         const [x, y] = this.cellPos(piece.x + c, row);
-        drawGhost(ctx, x, y, cell, piece.id);
+        drawGhost(ctx, x + shift(row), y, cell, piece.id);
       }
 
     // Столбы-указатели: видно, куда именно упадёт фигура.
@@ -149,7 +155,7 @@ export class BoardView {
         const row = piece.y + r;
         if (row < HIDDEN_ROWS) continue;
         const [x, y] = this.cellPos(piece.x + c, row);
-        drawBlock(ctx, x, y, cell, piece.id, {
+        drawBlock(ctx, x + shift(row), y, cell, piece.id, {
           glow: 0.55 + lockProgress * 0.4,
           flash: pulse * lockProgress,
         });

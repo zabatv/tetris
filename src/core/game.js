@@ -1,6 +1,6 @@
 import {
   COLS, ROWS, HIDDEN_ROWS, LOCK_DELAY, MAX_LOCK_RESETS, SPAWN_DELAY,
-  CLEAR_DELAY_BASE, CLEAR_DELAY_PER_ROW, gravityFor,
+  CLEAR_DELAY_BASE, CLEAR_DELAY_PER_ROW, CLEAR_DELAY_SPIN, gravityFor,
 } from './constants.js';
 import { Bag } from './bag.js';
 import { shapeOf, spawnPiece, kicksFor, cellsOf } from './pieces.js';
@@ -253,7 +253,8 @@ export class Game {
     this.piece = null;
 
     if (rows.length) {
-      const duration = CLEAR_DELAY_BASE + rows.length * CLEAR_DELAY_PER_ROW;
+      const duration = CLEAR_DELAY_BASE + rows.length * CLEAR_DELAY_PER_ROW
+        + (spin !== 'none' ? CLEAR_DELAY_SPIN : 0);
       this.clearInfo = { rows, spin, duration };
       this.clearTimer = duration;
       this.phase = PHASE.CLEARING;

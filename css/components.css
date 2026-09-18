@@ -8,7 +8,9 @@
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
   box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(16px) saturate(130%);
+  /* Без backdrop-filter: размытие фона пересчитывалось бы каждый кадр,
+     а фон под панелями живой. Стекло имитируем слоями и подсветкой. */
+  background-color: rgba(10, 12, 20, 0.62);
   overflow: hidden;
 }
 
@@ -406,8 +408,9 @@ kbd {
   gap: 16px;
   padding: 24px;
   text-align: center;
-  background: radial-gradient(circle at 50% 45%, rgba(10, 12, 20, 0.82), rgba(4, 5, 9, 0.96));
-  backdrop-filter: blur(10px);
+  background:
+    radial-gradient(circle at 50% 45%, rgba(10, 12, 20, 0.86), rgba(4, 5, 9, 0.97) 70%),
+    linear-gradient(180deg, rgba(4, 5, 9, 0.6), rgba(4, 5, 9, 0.92));
   animation: overlay-in 320ms var(--ease-out);
 }
 
@@ -473,4 +476,31 @@ kbd {
   color: var(--gold);
   font-size: 13px;
   letter-spacing: 0.08em;
+}
+
+/* Переключатель силы эффектов: цвет подсказывает степень безумия. */
+.btn--madness {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  min-width: 96px;
+}
+
+.btn--madness-calm { color: var(--text-dim); }
+
+.btn--madness-wild {
+  color: var(--accent);
+  border-color: rgba(34, 211, 238, 0.5);
+}
+
+.btn--madness-insane {
+  color: var(--gold);
+  border-color: rgba(255, 210, 74, 0.6);
+  box-shadow: 0 0 22px -6px rgba(255, 210, 74, 0.8);
+  animation: madness-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes madness-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.35) saturate(1.4); }
 }

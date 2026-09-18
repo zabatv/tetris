@@ -36,6 +36,11 @@ function TopBar({ state, session, onToggleLobby, lobbyOpen }) {
         disabled: !state.started || state.phase === PHASE.OVER,
       }, state.paused ? '▶' : '❚❚'),
       h('button', {
+        className: `btn btn--madness btn--madness-${state.madness}`,
+        onClick: () => session.cycleMadness(),
+        title: 'Сила эффектов',
+      }, state.madnessLabel),
+      h('button', {
         className: `btn ${lobbyOpen ? 'btn--active' : ''}`,
         onClick: onToggleLobby,
       }, 'Мультиплеер'),
@@ -129,6 +134,10 @@ export function App() {
     text: useRef(null),
     floats: useRef(null),
     chroma: useRef(null),
+    glitch: useRef(null),
+    scanlines: useRef(null),
+    vignette: useRef(null),
+    screen: useRef(null),
     background: useRef(null),
     next: useRef(null),
     hold: useRef(null),
@@ -155,9 +164,12 @@ export function App() {
   const showOver = ready && state.phase === PHASE.OVER && state.summary;
 
   return h(Fragment, null,
-    h('canvas', { id: 'bg-canvas', ref: refs.background }),
+    // Всё, что должно ловить общий фильтр (оттенок, насыщенность, размытие),
+    // лежит внутри #screen — фильтр на одном слое дешевле, чем на многих.
+    h('div', { id: 'screen', ref: refs.screen },
+      h('canvas', { id: 'bg-canvas', ref: refs.background }),
 
-    h('div', { className: 'app' },
+      h('div', { className: 'app' },
       ready
         ? h(TopBar, {
           state, session, lobbyOpen,
@@ -230,6 +242,11 @@ export function App() {
           ready ? h(Opponents, { state, session }) : null,
         ),
       ),
+      ),
+
+      h('div', { id: 'screen-scanlines', ref: refs.scanlines }),
+      h('div', { id: 'screen-vignette', ref: refs.vignette }),
+      h('div', { id: 'screen-glitch', ref: refs.glitch }),
     ),
 
     ready ? h(Lobby, {

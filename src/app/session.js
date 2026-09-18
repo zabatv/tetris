@@ -3,7 +3,7 @@ import { HIDDEN_ROWS, ROWS_VISIBLE } from '../core/constants.js';
 import { BoardView } from '../render/board-view.js';
 import { PreviewView } from '../render/preview.js';
 import { Background } from '../render/background.js';
-import { Particles } from '../render/particles.js';
+import { Particles, drawSpeedLines } from '../render/particles.js';
 import { drawOpponent } from '../render/opponent-view.js';
 import { colorOf } from '../render/palette.js';
 import { ScreenFX, TimeScale } from '../fx/effects.js';
@@ -12,7 +12,22 @@ import { Controls } from '../input/controls.js';
 import { Net } from '../net/net.js';
 
 const BEST_KEY = 'tetris.best';
+const MADNESS_KEY = 'tetris.madness';
 const STATE_INTERVAL = 90;
+
+// Уровни безумия: множитель всех экранных эффектов.
+export const MADNESS_LEVELS = [
+  { id: 'calm', label: 'СПОКОЙНО', value: 0.45 },
+  { id: 'wild', label: 'ЛЮТО', value: 1 },
+  { id: 'insane', label: 'БЕЗУМИЕ', value: 1.7 },
+];
+
+function loadMadness() {
+  try {
+    const saved = localStorage.getItem(MADNESS_KEY);
+    return MADNESS_LEVELS.find(level => level.id === saved) || MADNESS_LEVELS[1];
+  } catch { return MADNESS_LEVELS[1]; }
+}
 
 function loadBest() {
   try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch { return 0; }
@@ -41,10 +56,14 @@ export class Session {
     this.particles = new Particles();
     this.fx = new ScreenFX({
       stage: refs.stage,
+      screen: refs.screen,
       flash: refs.flash,
       textLayer: refs.text,
       floats: refs.floats,
       chroma: refs.chroma,
+      glitch: refs.glitch,
+      scanlines: refs.scanlines,
+      vignette: refs.vignette,
       reducedMotion: this.reducedMotion,
     });
     this.time = new TimeScale();
@@ -57,9 +76,13 @@ export class Session {
     this.lastFrame = 0;
     this.stateTimer = 0;
     this.softSoundTimer = 0;
+    this.frameAvg = 16.7;
+    this.quality = 1;
     this.opponentCanvases = new Map();
     this.opponents = [];
     this.lastSummary = null;
+    this.madness = loadMadness();
+    this.applyMadness();
 
     this.controls = new Controls(this.actionMap(), { touchTarget: refs.stage });
     this.controls.attach();
@@ -91,6 +114,21 @@ export class Session {
       restart: () => this.start(),
       mute: () => { this.audio.toggleMuted(); this.publish(); },
     };
+  }
+
+  applyMadness() {
+    this.fx.setMadness(this.madness.value);
+    this.background.setMadness(this.madness.value);
+  }
+
+  /** Переключает уровень экранного безумия по кругу. */
+  cycleMadness() {
+    const index = MADNESS_LEVELS.indexOf(this.madness);
+    this.madness = MADNESS_LEVELS[(index + 1) % MADNESS_LEVELS.length];
+    try { localStorage.setItem(MADNESS_KEY, this.madness.id); } catch { /* приватный режим */ }
+    this.applyMadness();
+    this.fx.banner(this.madness.label, 'cool');
+    this.publish();
   }
 
   // --- управление сессией ----------------------------------------------------
@@ -211,15 +249,21 @@ export class Session {
 
       case 'harddrop': {
         const { distance, cells } = payload;
+        const id = this.game.piece ? this.game.piece.id : 1;
         this.audio.hardDrop(distance);
         for (const [col, row] of cells) {
           const [x, y] = toScreen(col, row);
-          this.particles.streak(x, y - cell, colorOf(this.game.piece ? this.game.piece.id : 1), Math.min(140, distance * cell));
-          this.particles.dust(x, y, colorOf(this.game.piece ? this.game.piece.id : 1), 2);
+          this.particles.streak(x, y - cell, colorOf(id), Math.min(220, distance * cell));
+          this.particles.dust(x, y, colorOf(id), 3);
+          this.particles.spark(x, y + cell * 0.4, colorOf(id), 4, 0.3);
         }
-        this.fx.shake(Math.min(9, 2 + distance * 0.45), 220);
-        this.fx.zoomPunch(Math.min(0.04, 0.012 + distance * 0.002), 240);
-        if (distance >= 12) this.fx.chromatic(240);
+        // Удар о дно: стоп-кадр, тряска и лучи по краям.
+        this.time.freeze(18 + Math.min(40, distance * 2.5));
+        this.fx.shake(4 + distance * 0.8, 260);
+        this.fx.zoomPunch(0.03 + distance * 0.006, 260);
+        this.fx.speed(0.35 + distance * 0.05, 0.004);
+        if (distance >= 8) this.fx.chromatic(260);
+        if (distance >= 14) this.fx.glitch(220, 0.6);
         break;
       }
 
@@ -229,20 +273,32 @@ export class Session {
           const [x, y] = toScreen(col, row);
           this.particles.dust(x, y + cell * 0.4, colorOf(payload.piece.id), 2);
         }
-        this.fx.shake(2.5, 140);
+        this.fx.shake(3, 150);
+        if (payload.spin !== 'none') {
+          // Спин без слома тоже надо заметить.
+          this.fx.hueBurst(180, 500);
+          this.fx.chromatic(200);
+          this.particles.ring(this.boardView.width / 2, (payload.cells[0][1] - HIDDEN_ROWS) * cell, '#c084fc', { growth: 0.6, width: 3 });
+        }
         break;
       }
 
       case 'clearstart': {
-        const { rows, cleared, duration } = payload;
-        // Замедление + наезд камеры: момент слома читается как событие.
-        this.time.slow(duration + 200, cleared >= 3 ? 0.16 : 0.26);
+        const { rows, cleared, spin, duration } = payload;
+        const heavy = cleared >= 3 || spin !== 'none';
+        // Время почти встаёт: дальше всё держится на картинке и звуке.
+        this.time.slow(duration + 260, heavy ? 0.05 : 0.12);
         this.audio.riser(duration / 1000, cleared);
         const centerY = (rows[0] - HIDDEN_ROWS + rows.length / 2) * cell;
         this.teaseCenter = centerY;
-        this.background.pulse(0.4 + cleared * 0.2);
+        this.fx.speed(0.6 + cleared * 0.25, 0.0012);
+        this.fx.chromatic(duration);
+        this.background.pulse(0.5 + cleared * 0.25);
+        this.background.burst(0.5 + cleared * 0.35, cleared * 0.5);
         for (const row of rows) {
-          this.particles.rowBlast((row - HIDDEN_ROWS + 0.5) * cell, this.boardView.width, '#ffffff', 10 + cleared * 4);
+          const y = (row - HIDDEN_ROWS + 0.5) * cell;
+          this.particles.rowBlast(y, this.boardView.width, '#ffffff', 12 + cleared * 6);
+          this.particles.bolt(0, y, this.boardView.width, y + (Math.random() - 0.5) * cell, '#ffffff', 10);
         }
         break;
       }
@@ -255,18 +311,34 @@ export class Session {
         this.audio.levelUp();
         this.audio.setLevel(payload.level);
         this.fx.banner(`УРОВЕНЬ ${payload.level}`, 'cool');
-        this.fx.flash('rgba(34,211,238,0.35)', 260);
-        this.background.pulse(1.1);
+        this.fx.flash('rgba(34,211,238,0.5)', 320);
+        this.fx.hueBurst(540, 1200);
+        this.fx.zoomPunch(0.1, 520);
+        this.fx.shake(7, 420);
+        this.fx.glitch(420, 0.9);
+        this.background.pulse(1.4);
+        this.background.burst(1.4, 1.6);
+        this.particles.firework(this.boardView.width / 2, this.boardView.height / 2, 60);
+        this.particles.confetti(this.boardView.width / 2, this.boardView.height * 0.3, 40, 1.4);
         break;
 
       case 'garbage':
         this.audio.garbage(payload.count);
-        this.fx.shake(3 + payload.count, 260);
-        this.fx.flash('rgba(251,113,133,0.22)', 220);
+        this.fx.shake(4 + payload.count * 1.5, 320);
+        this.fx.flash('rgba(251,113,133,0.3)', 260);
+        this.fx.glitch(260, 0.7);
+        this.fx.hueBurst(-120, 420);
+        for (let i = 0; i < payload.count; i++) {
+          const y = this.boardView.height - (i + 0.5) * cell;
+          this.particles.spark(Math.random() * this.boardView.width, y, '#fb7185', 8, 0.4);
+        }
         break;
 
       case 'incoming':
-        if (payload.pending >= 4) this.fx.banner(`ВХОДЯЩИЕ ${payload.pending}`, 'hot');
+        if (payload.pending >= 4) {
+          this.fx.banner(`ВХОДЯЩИЕ ${payload.pending}`, 'hot');
+          this.fx.chromatic(200);
+        }
         break;
 
       case 'gameover':
@@ -280,31 +352,58 @@ export class Session {
     const { rows, cleared, spin, points, label, perfect, b2b, combo, attack } = payload;
     const centerY = (rows[0] - HIDDEN_ROWS + rows.length / 2) * cell;
     const centerX = this.boardView.width / 2;
-    const big = cleared >= 3 || spin !== 'none' || perfect;
+    const heavy = cleared >= 3 || spin !== 'none' || perfect;
+    const weight = cleared + (spin !== 'none' ? 2 : 0) + (perfect ? 3 : 0) + Math.min(4, combo);
 
     this.audio.clear(cleared, spin, perfect);
     if (combo > 0) this.audio.combo(combo);
 
+    // Момент удара: время встаёт, картинку рвёт, потом всё отпускает.
     this.fx.setTease(null);
-    this.fx.flash(perfect ? 'rgba(255,255,255,0.75)' : big ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.28)', big ? 320 : 200);
-    this.fx.shake(4 + cleared * 3 + (big ? 4 : 0), 340);
-    this.fx.zoomPunch(0.03 + cleared * 0.018, 380);
-    if (big) this.fx.chromatic(320);
+    this.time.release();
+    this.time.freeze(60 + weight * 14);
+    this.time.slow(220 + weight * 40, 0.35);
+
+    this.fx.flash(perfect ? 'rgba(255,255,255,0.95)' : heavy ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.45)', 200 + weight * 30);
+    this.fx.shake(8 + weight * 3.2, 420 + weight * 30);
+    this.fx.zoomPunch(0.08 + weight * 0.035, 460);
+    this.fx.zoom(-0.06 - weight * 0.012, 700, 0.25);
+    this.fx.chromatic(280 + weight * 40);
+    this.fx.glitch(300 + weight * 60, 0.8 + weight * 0.18);
+    this.fx.hueBurst(180 + weight * 90, 700 + weight * 80);
+    this.fx.speed(0.8 + weight * 0.18, 0.0035);
+
     this.fx.banner(label, perfect ? 'gold' : spin !== 'none' ? 'cool' : cleared === 4 ? 'gold' : 'normal');
     if (b2b) this.fx.banner('BACK-TO-BACK', 'cool');
     if (combo > 0) this.fx.banner(`КОМБО ×${combo}`, combo >= 4 ? 'hot' : 'gold');
-    this.fx.floatText(centerX, centerY, `+${points}`, big ? 'gold' : 'normal');
+    this.fx.floatText(centerX, centerY, `+${points}`, heavy ? 'gold' : 'normal');
 
     for (const row of rows) {
       const y = (row - HIDDEN_ROWS + 0.5) * cell;
-      this.particles.rowBlast(y, this.boardView.width, big ? '#ffd24a' : '#22d3ee', 18 + cleared * 6);
-      for (let i = 0; i < 4 + cleared * 2; i++) {
-        this.particles.shards(Math.random() * this.boardView.width, y, big ? '#ffd24a' : '#22d3ee', 2, cell);
+      this.particles.rowBlast(y, this.boardView.width, heavy ? '#ffd24a' : '#22d3ee', 26 + weight * 8);
+      for (let i = 0; i < 6 + weight * 3; i++) {
+        this.particles.shards(Math.random() * this.boardView.width, y, heavy ? '#ffd24a' : '#22d3ee', 3, cell);
+      }
+      this.particles.bolt(0, y, this.boardView.width, y, '#ffffff', 12);
+      this.particles.ring(centerX, y, heavy ? '#ffd24a' : '#22d3ee', { growth: 0.9, width: 3 });
+    }
+
+    this.particles.confetti(centerX, centerY, 30 + weight * 12, 1 + weight * 0.12);
+    this.particles.ring(centerX, centerY, '#ffffff', { growth: 1.2 + weight * 0.2, width: 4 + weight });
+    if (heavy) {
+      this.particles.firework(centerX, centerY, 50 + weight * 10);
+      this.particles.ring(centerX, centerY, '#c084fc', { growth: 0.6, width: 3 });
+      // Серия салютов вдогонку — праздник длится дольше одного кадра.
+      for (let i = 1; i <= Math.min(4, weight); i++) {
+        setTimeout(() => this.particles.firework(
+          Math.random() * this.boardView.width,
+          this.boardView.height * (0.2 + Math.random() * 0.5),
+          34,
+        ), i * 130);
       }
     }
-    this.particles.ring(centerX, centerY, big ? '#ffd24a' : '#22d3ee', { growth: 0.7 + cleared * 0.15, width: 3 + cleared });
-    if (big) this.particles.ring(centerX, centerY, '#c084fc', { growth: 0.45, width: 2 });
-    this.background.pulse(0.6 + cleared * 0.35);
+    this.background.pulse(0.8 + weight * 0.3);
+    this.background.burst(0.6 + weight * 0.25, 0.8 + weight * 0.3);
 
     if (attack > 0) {
       this.net.sendAttack(attack);
@@ -315,21 +414,37 @@ export class Session {
   onGameOver(payload) {
     this.audio.gameOver();
     this.audio.stopMusic();
-    this.fx.shake(14, 700);
-    this.fx.chromatic(600);
-    this.fx.flash('rgba(251,113,133,0.4)', 600);
-    this.background.pulse(1.6);
-    for (let i = 0; i < 24; i++) {
+    this.time.freeze(140);
+    this.time.slow(2200, 0.1);
+    this.fx.shake(22, 900);
+    this.fx.chromatic(900);
+    this.fx.glitch(1400, 1.6);
+    this.fx.hueBurst(900, 1800);
+    this.fx.zoom(-0.18, 1600, 0.2);
+    this.fx.flash('rgba(251,113,133,0.6)', 700);
+    this.fx.speed(1.2, 0.0009);
+    this.background.pulse(2);
+    this.background.burst(2, 2);
+    for (let i = 0; i < 40; i++) {
       this.particles.shards(
         Math.random() * this.boardView.width,
         Math.random() * this.boardView.height,
         '#fb7185', 3, this.boardView.cell,
       );
     }
+    this.particles.confetti(this.boardView.width / 2, this.boardView.height / 2, 60, 1.6);
+    for (let i = 0; i < 6; i++) {
+      this.particles.bolt(
+        Math.random() * this.boardView.width, 0,
+        Math.random() * this.boardView.width, this.boardView.height,
+        '#fb7185', 14,
+      );
+    }
     if (payload.score > this.best) {
       this.best = payload.score;
       saveBest(this.best);
       this.fx.banner('НОВЫЙ РЕКОРД', 'gold');
+      this.particles.firework(this.boardView.width / 2, this.boardView.height * 0.35, 80);
     }
     this.lastSummary = { ...payload, best: this.best };
   }
@@ -341,13 +456,24 @@ export class Session {
     const dt = this.lastFrame ? Math.min(now - this.lastFrame, 100) : 16;
     this.lastFrame = now;
 
+    this.tuneQuality(dt);
     const scale = this.time.update(dt);
     const active = this.started && this.game.running && !this.paused;
 
     if (active) {
       this.controls.update(dt);
-      this.game.update(dt * scale);
+      // Слоу-мо замедляет игру, но не кинематику слома: её длительность —
+      // это реальные секунды, иначе тизер растянулся бы на полминуты.
+      this.game.update(this.game.phase === PHASE.CLEARING ? dt : dt * scale);
     }
+
+    // Фоновое безумие: комбо, уровень и близость завала к верху.
+    const danger = Math.max(0, (this.game.stackHeight - ROWS_VISIBLE * 0.6) / (ROWS_VISIBLE * 0.4));
+    const ambient = this.game.running
+      ? Math.min(1, Math.max(0, this.game.combo - 1) * 0.14 + (this.game.level - 1) * 0.045 + danger * 0.45 + this.game.b2bChain * 0.08)
+      : 0;
+    this.fx.setAmbient(ambient);
+    this.background.setIntensity(ambient);
 
     // Тизер перед сломом ведём вручную: камера смотрит на ряды, которые уйдут.
     if (this.game.phase === PHASE.CLEARING && this.game.clearInfo) {
@@ -357,19 +483,30 @@ export class Session {
       this.fx.setTease(null);
     }
 
-    this.particles.update(dt, 0.35 + scale * 0.65);
+    // Частицы почти не тормозят вместе с игрой — иначе слоу-мо выглядит мёртвым.
+    this.particles.update(dt, 0.45 + scale * 0.55);
     this.fx.update(dt);
     this.background.render(dt, { level: this.game.level });
 
     this.boardView.time = now;
-    this.boardView.render(this.game, { time: now });
+    this.boardView.render(this.game, {
+      time: now,
+      warp: (this.fx.tease ? Math.pow(this.fx.tease.progress, 2) * 1.2 : 0) + ambient * 0.25,
+    });
 
     this.fxCtx.clearRect(0, 0, this.boardView.width, this.boardView.height);
+    drawSpeedLines(this.fxCtx, {
+      strength: this.fx.speedLines,
+      width: this.boardView.width,
+      height: this.boardView.height,
+      focusY: this.fx.tease ? this.teaseCenter : null,
+      time: now,
+    });
     this.particles.render(this.fxCtx);
 
     this.nextView.renderQueue(this.game.nextQueue);
     if (this.game.hold) this.holdView.renderSingle(this.game.hold);
-    else this.holdView.clear();
+    else if (this.holdView.signature !== 'empty') { this.holdView.clear(); this.holdView.signature = 'empty'; }
 
     this.renderOpponents(now);
     this.syncStageClasses();
@@ -380,6 +517,21 @@ export class Session {
         this.stateTimer = 0;
         this.net.sendState(this.game.snapshot());
       }
+    }
+  }
+
+  /**
+   * Следим за длительностью кадра и мягко снижаем нагрузку, если машина
+   * не тянет: эффекты остаются, но становятся дешевле.
+   */
+  tuneQuality(dt) {
+    this.frameAvg += (Math.min(dt, 120) - this.frameAvg) * 0.05;
+    const target = this.frameAvg > 30 ? -1 : this.frameAvg < 20 ? 1 : 0;
+    if (target) {
+      this.quality = Math.max(0, Math.min(1, this.quality + target * 0.004));
+      this.fx.setQuality(this.quality);
+      this.background.setQuality(this.quality);
+      this.particles.limit = 260 + Math.round(this.quality * 740);
     }
   }
 
@@ -415,6 +567,8 @@ export class Session {
       best: this.best,
       muted: this.audio.muted,
       music: this.audio.musicEnabled,
+      madness: this.madness.id,
+      madnessLabel: this.madness.label,
       opponents: this.opponents,
       summary: this.lastSummary,
       levelProgress: (this.game.lines % 10) / 10,

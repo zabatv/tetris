@@ -8,6 +8,14 @@
   z-index: 0;
 }
 
+/* На телефоне страница прокручивается, поэтому экран-обёртка не фиксируется. */
+@media (max-width: 680px) {
+  #screen {
+    position: relative;
+    inset: auto;
+  }
+}
+
 .app {
   position: relative;
   z-index: 1;
@@ -22,8 +30,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px 16px;
   flex: 0 0 auto;
+  flex-wrap: wrap;
 }
 
 .brand {
@@ -53,7 +62,10 @@
 .topbar__tools {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .playfield {
@@ -88,6 +100,8 @@
 
 .stage {
   position: relative;
+  /* Во время наезда камеры поле должно перекрывать панели, а не наоборот. */
+  z-index: 3;
   width: var(--board-w);
   height: var(--board-h);
   border-radius: var(--radius);
@@ -156,8 +170,7 @@
     top: 0;
     z-index: 20;
     padding: 6px 0;
-    background: linear-gradient(180deg, rgba(7, 8, 13, 0.92), rgba(7, 8, 13, 0));
-    backdrop-filter: blur(8px);
+    background: linear-gradient(180deg, rgba(7, 8, 13, 0.96), rgba(7, 8, 13, 0.72) 70%, rgba(7, 8, 13, 0));
   }
   .playfield {
     grid-template-columns: auto;

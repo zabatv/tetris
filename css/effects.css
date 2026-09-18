@@ -16,6 +16,10 @@
 }
 
 #fx-text {
+  /* Длинные подписи вроде «ИДЕАЛЬНАЯ ЗАЧИСТКА» шире стакана — не обрезаем. */
+  overflow: visible;
+  left: -30%;
+  right: -30%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -44,7 +48,8 @@
 
 .fx-banner {
   font-family: var(--font-mono);
-  font-size: clamp(15px, calc(var(--cell) * 0.72), 26px);
+  font-size: clamp(13px, calc(var(--cell) * 0.62), 24px);
+  white-space: nowrap;
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -99,7 +104,7 @@
 }
 
 @keyframes overlay-in {
-  from { opacity: 0; backdrop-filter: blur(0); }
+  from { opacity: 0; }
   to { opacity: 1; }
 }
 
@@ -130,8 +135,7 @@
   justify-content: center;
   gap: 10px;
   border-radius: var(--radius);
-  background: rgba(5, 6, 11, 0.55);
-  backdrop-filter: blur(3px);
+  background: rgba(5, 6, 11, 0.72);
   font-family: var(--font-mono);
   letter-spacing: 0.3em;
   text-transform: uppercase;
@@ -149,4 +153,57 @@
     transition-duration: 0.01ms !important;
   }
   .stage { transform: none !important; filter: none !important; }
+}
+
+/* --- полноэкранные слои безумия ------------------------------------------- */
+
+#screen {
+  position: fixed;
+  inset: 0;
+  /* Фильтр ставится из JS покадрово: hue-rotate / saturate / contrast / blur. */
+  will-change: filter;
+}
+
+#screen-scanlines,
+#screen-vignette,
+#screen-glitch {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+/* Развёртка: тонкие строки, как на старом мониторе. */
+#screen-scanlines {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.035) 0px,
+    rgba(255, 255, 255, 0.035) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.35;
+}
+
+/* Виньетка сжимается к центру на сломах — туннельное зрение. */
+#screen-vignette {
+  opacity: 0;
+  background: radial-gradient(circle at 50% 50%, transparent 28%, rgba(0, 0, 0, 0.9) 96%);
+  transition: opacity 90ms linear;
+}
+
+/* Глитч: полоса картинки уезжает вбок и красится в контрастные каналы. */
+#screen-glitch {
+  opacity: 0;
+  background:
+    repeating-linear-gradient(to bottom, rgba(255, 0, 90, 0.35) 0 2px, transparent 2px 5px),
+    repeating-linear-gradient(to bottom, rgba(0, 220, 255, 0.3) 0 3px, transparent 3px 7px);
+  mix-blend-mode: screen;
+  will-change: transform, clip-path;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #screen-scanlines,
+  #screen-glitch { display: none; }
+  #screen { filter: none !important; }
 }
